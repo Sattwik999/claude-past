@@ -16,7 +16,7 @@ import type { Scope } from './picker.js'
 import { bold, dim, gold, grey, tildify } from './colors.js'
 import type { Session } from './types.js'
 
-const VERSION = '1.3.0'
+const VERSION = '1.4.0'
 
 function help(): void {
   console.log(`
@@ -26,6 +26,8 @@ function help(): void {
   ${bold('Usage')}
     claude-past                      Interactive picker with live search
     claude-past <words>              Picker, already filtered by those words
+    claude-past <n>                  Resume the n-th most recent session started
+                                     in this directory (1 = the latest; -g = anywhere)
     claude-past open <n|id>          Resume a session in Claude Code
     claude-past view <n|id> [-s q]   Print a session's conversation
     claude-past rename <n|id> <name> Give a session your own name
@@ -192,6 +194,18 @@ async function main(): Promise<void> {
   }
 
   if (cmd === 'list') return listSessions(filterSessions(sessions, args.slice(1).join(' ')))
+
+  // A bare number resumes that session straight away: 1 is the most recent
+  // one started in this directory (or anywhere, with -g).
+  if (args.length === 1 && /^[1-9]\d*$/.test(args[0])) {
+    const scoped = flag === 'all' ? all : here
+    const n = parseInt(args[0], 10)
+    if (!scoped.length) {
+      fail(`No sessions were started in ${tildify(dir)}. Use \`claude-past ${n} -g\` to count across all directories.`)
+    }
+    if (n <= scoped.length) return openInClaude(scoped[n - 1])
+    // A number past the end of the list is treated as a search word below.
+  }
 
   // Default: interactive picker (plain list when not in a terminal).
   const query = args.join(' ')

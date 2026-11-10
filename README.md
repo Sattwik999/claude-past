@@ -29,7 +29,9 @@ Requires Node.js 18+ and Claude Code. Tested on macOS and Linux; on Windows, res
 ```bash
 claude-past                       # interactive picker — just start typing to search
 claude-past kitty theme           # picker, already filtered
-claude-past open 1                # resume the most recent session
+claude-past 1                     # resume the latest session started in this directory
+claude-past 2 -g                  # resume the 2nd most recent session from anywhere
+claude-past open 1                # resume the most recent session from any directory
 claude-past open c7b4             # resume by the start of a session ID
 claude-past view 2                # print a conversation
 claude-past view 2 -s background  # only the turns that mention "background"
