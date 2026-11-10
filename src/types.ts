@@ -1,37 +1,42 @@
-export interface RawMessage {
-  type: string
-  uuid?: string
-  parentUuid?: string
-  timestamp?: string
-  message?: {
-    role: string
-    content: string | ContentBlock[]
-    model?: string
-    id?: string
-  }
-  origin?: { kind: string }
-  title?: string
-  sessionId?: string
-}
-
 export interface ContentBlock {
-  type: 'text' | 'tool_use' | 'tool_result' | 'thinking' | string
+  type: string
   text?: string
   name?: string
-  input?: unknown
+}
+
+/** One line of a Claude Code session .jsonl file (only the fields we use). */
+export interface RawEntry {
+  type: string
+  timestamp?: string
+  cwd?: string
+  isSidechain?: boolean
+  aiTitle?: string
+  origin?: { kind?: string }
+  message?: {
+    role?: string
+    content?: string | ContentBlock[]
+  }
+}
+
+/** One prompt from the user and everything Claude said in reply. */
+export interface Turn {
+  prompt: string
+  promptTs: string
+  reply: string
+  replyTs: string
 }
 
 export interface Session {
   id: string
   filePath: string
+  /** Folder the session was started in; `claude --resume` must run there. */
+  cwd: string
+  /** Name to show: custom name, else Claude's own title, else first prompt. */
   title: string
-  turns: number
+  customName: string
+  turns: Turn[]
   firstTs: string
   lastTs: string
-  messages: RawMessage[]
-}
-
-export interface ConversationPair {
-  user: RawMessage
-  assistant: RawMessage
+  /** Lower-cased title + id + folder + full conversation, for searching. */
+  haystack: string
 }

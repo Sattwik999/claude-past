@@ -1,6 +1,6 @@
 {
-  "name": "claude-history",
-  "version": "1.0.0",
+  "name": "@sattwik999/claude-past",
+  "version": "1.2.0",
   "description": "Browse and search your Claude Code terminal sessions from the CLI",
   "keywords": [
     "claude",
@@ -9,22 +9,24 @@
     "ai",
     "cli",
     "terminal",
-    "history"
+    "history",
+    "sessions",
+    "resume"
   ],
-  "author": "Sattwik Sarkar",
+  "author": "Sattwik Sarkar (https://github.com/Sattwik999)",
   "license": "MIT",
-  "homepage": "https://github.com/sattwik/claude-history",
+  "homepage": "https://github.com/Sattwik999/claude-past#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sattwik/claude-history.git"
+    "url": "git+https://github.com/Sattwik999/claude-past.git"
   },
   "bugs": {
-    "url": "https://github.com/sattwik/claude-history/issues"
+    "url": "https://github.com/Sattwik999/claude-past/issues"
   },
   "type": "module",
   "bin": {
-    "claude-history": "./dist/cli.js",
-    "ch": "./dist/cli.js"
+    "claude-past": "dist/cli.js",
+    "cpa": "dist/cli.js"
   },
   "files": [
     "dist",
@@ -47,5 +49,8 @@
   "allowScripts": {
     "esbuild@0.28.2": true,
     "fsevents@2.3.3": true
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

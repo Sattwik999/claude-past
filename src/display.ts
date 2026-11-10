@@ -1,102 +1,89 @@
-import type { Session, RawMessage } from './types.js'
+import type { Session } from './types.js'
 import {
-  bold, dim, gold, blue, green, grey, purple, cyan, yellow,
-  frame, header, divider, fmtTime, W, reset,
+  bold, dim, gold, blue, green, grey, purple, cyan, yellow, frame,
+  fit, fmtShort, fmtTime, tildify, width,
 } from './colors.js'
-import { getPairs, extractText } from './sessions.js'
 
-function wrap(text: string, width: number, indent = ''): string {
-  const words = text.split(' ')
+function wrap(text: string, max: number): string[] {
   const lines: string[] = []
   let cur = ''
-  for (const w of words) {
-    if (cur.length + w.length + 1 > width) {
-      if (cur) lines.push(indent + cur)
-      cur = w
+  for (const word of text.split(' ')) {
+    if (cur && cur.length + word.length + 1 > max) {
+      lines.push(cur)
+      cur = word
     } else {
-      cur = cur ? `${cur} ${w}` : w
+      cur = cur ? `${cur} ${word}` : word
     }
   }
-  if (cur) lines.push(indent + cur)
-  return lines.join('\n')
+  if (cur) lines.push(cur)
+  return lines
 }
 
-function highlightSearch(text: string, search: string): string {
+function highlight(text: string, search: string): string {
   if (!search) return text
-  const re = new RegExp(`(${search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
-  return text.replace(re, yellow(bold('$1')))
+  const re = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
+  return text.replace(re, m => yellow(bold(m)))
 }
 
-function renderContent(text: string, search = ''): string {
-  const lines: string[] = []
+function renderBody(text: string, search: string, max: number): string {
+  const out: string[] = []
+  let inCode = false
   for (const line of text.split('\n')) {
-    const hl = highlightSearch(line, search)
     if (line.trim().startsWith('```')) {
-      lines.push(`  ${purple(line)}`)
-    } else if (/^#{1,3} /.test(line)) {
-      lines.push(`  ${bold(gold(hl))}`)
-    } else if (/^[-*] /.test(line.trim())) {
-      lines.push(`  ${cyan(hl)}`)
+      inCode = !inCode
+      out.push(`  ${purple(line)}`)
+    } else if (inCode) {
+      out.push(`  ${purple(highlight(line, search))}`)
+    } else if (/^#{1,4} /.test(line)) {
+      out.push(`  ${bold(gold(line))}`)
     } else if (line.trim() === '') {
-      lines.push('')
+      out.push('')
     } else {
-      lines.push(wrap(hl, W - 2, '  '))
+      const paint = /^\s*[-*] /.test(line) ? cyan : (s: string) => s
+      for (const l of wrap(line, max)) out.push(`  ${paint(highlight(l, search))}`)
     }
   }
-  return lines.join('\n')
+  return out.join('\n')
 }
 
-function printMsg(role: 'user' | 'assistant', msg: RawMessage, search = '') {
-  const icon    = role === 'user' ? blue(bold('▶  You')) : green(bold('◆  Claude'))
-  const timeStr = msg.timestamp ? `  ${grey(fmtTime(msg.timestamp))}` : ''
-  const text    = extractText(msg.message?.content)
-
-  console.log(`\n  ${icon}${timeStr}`)
-  console.log(divider())
-  console.log(renderContent(text, search))
+/** Plain numbered list (used when output is piped, and by `list`). */
+export function listSessions(sessions: Session[]): void {
+  const w = width()
+  const titleW = w - 34
+  console.log()
+  console.log(`  ${bold(gold('Claude Code sessions'))}  ${grey(String(sessions.length))}`)
+  console.log(`  ${frame('─'.repeat(w))}`)
+  sessions.forEach((s, i) => {
+    const num = gold(bold(String(i + 1).padStart(2) + '.'))
+    const turns = dim(`${s.turns.length} turns`.padStart(9))
+    console.log(`  ${num} ${bold(fit(s.title, titleW))} ${turns}  ${grey(fmtShort(s.lastTs))}`)
+    console.log(`      ${purple(s.id)}  ${grey(tildify(s.cwd))}`)
+  })
+  console.log()
 }
 
-export function listSessions(sessions: Session[]) {
+/** Print a session's conversation; with `search`, only turns that mention it. */
+export function viewSession(session: Session, search = ''): void {
+  const w = width()
+  const q = search.toLowerCase()
+  const turns = q
+    ? session.turns.filter(t => `${t.prompt}\n${t.reply}`.toLowerCase().includes(q))
+    : session.turns
+
   console.log()
-  console.log(header('  Claude Code  ·  Past Sessions'))
-  console.log()
-  for (let i = 0; i < sessions.length; i++) {
-    const s   = sessions[i]
-    const num = gold(bold(`${(i + 1).toString().padStart(2)}.`))
-    const ttl = bold(s.title.slice(0, 54).padEnd(54))
-    const trn = dim(`${s.turns} turns`)
-    const dat = s.lastTs ? grey(fmtTime(s.lastTs)) : ''
-    const sid = purple(s.id)
-    console.log(`  ${num}  ${ttl}  ${trn}`)
-    console.log(`       ${sid}  ${dat}`)
-    console.log()
+  console.log(`  ${bold(gold(session.title))}`)
+  console.log(`  ${purple(session.id)}  ${grey(tildify(session.cwd))}`)
+  const shown = q ? `${turns.length} of ${session.turns.length} turns match "${search}"` : `${turns.length} turns`
+  console.log(`  ${dim(`${shown} · started ${fmtTime(session.firstTs)}`)}`)
+
+  for (const t of turns) {
+    console.log(`\n  ${frame('─'.repeat(w))}`)
+    console.log(`  ${blue(bold('▶ You'))}  ${grey(fmtTime(t.promptTs))}\n`)
+    console.log(renderBody(t.prompt, search, w))
+    if (t.reply) {
+      console.log(`\n  ${green(bold('◆ Claude'))}  ${grey(fmtTime(t.replyTs))}\n`)
+      console.log(renderBody(t.reply, search, w))
+    }
   }
-}
-
-export function viewSession(session: Session, search = '') {
-  const pairs = getPairs(session)
-  const filtered = search
-    ? pairs.filter(p =>
-        extractText(p.user.message?.content).toLowerCase().includes(search.toLowerCase()) ||
-        extractText(p.assistant.message?.content).toLowerCase().includes(search.toLowerCase())
-      )
-    : pairs
-
-  console.log()
-  console.log(header(`  ${session.title.slice(0, 60)}  [${session.id.slice(0, 8)}]`))
-  console.log(
-    `  ${dim(`${filtered.length} turns · started ${fmtTime(session.firstTs)}`)}\n`
-  )
-
-  if (!filtered.length) {
-    console.log(`  ${grey('No messages found.')}\n`)
-    return
-  }
-
-  for (const { user, assistant } of filtered) {
-    printMsg('user', user, search)
-    printMsg('assistant', assistant, search)
-    console.log(`\n  ${frame('═'.repeat(W))}`)
-  }
-  console.log()
+  console.log(`\n  ${dim(`Resume it:  claude-past open ${session.id.slice(0, 8)}`)}\n`)
 }

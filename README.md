@@ -1,86 +1,81 @@
-# claude-history
+# claude-past
 
-> Browse and search your [Claude Code](https://claude.ai/code) terminal sessions from the CLI — with a beautiful interactive picker, full conversation view, and search.
+An unofficial tool to browse, search, rename and resume your [Claude Code](https://claude.com/claude-code) sessions from the terminal.
 
-![demo](https://img.shields.io/badge/terminal-kitty-blueviolet) ![npm](https://img.shields.io/npm/v/claude-history) ![license](https://img.shields.io/badge/license-MIT-green)
+Claude Code saves every conversation on your machine. `claude-past` gives you a full-screen picker over all of them: type to search everything that was said, press Enter, and you are back inside that session in Claude Code.
 
 ## Features
 
-- 📋 **List all sessions** with titles, turn counts and timestamps
-- ⌨️  **Arrow-key picker** — navigate and open sessions without typing an ID
-- 🔍 **Search within sessions** — highlight matching turns
-- 🎨 **24-bit TrueColor** — gold, blue, purple, pink — looks great on Kitty, iTerm2, WezTerm
-- **Zero runtime dependencies** — pure Node.js, no external packages
+- **Live search** across titles, session IDs, folders and the full text of every conversation, with a matching excerpt under each result
+- **Enter opens the session in Claude Code** (`claude --resume`), in the folder it was started in
+- **Rename sessions** with your own names; Claude Code's files are never modified
+- **Read a transcript** without resuming it, optionally filtered to the turns that mention a word
+- **This directory or everywhere**: the picker asks which you want, and `Ctrl+G` switches at any time
+- **Zero runtime dependencies**
 
 ## Install
 
 ```bash
-npm install -g claude-history
+npm install -g @sattwik999/claude-past
 ```
 
-Or with pnpm / bun:
-
-```bash
-pnpm add -g claude-history
-bun add -g claude-history
-```
+Requires Node.js 18 or newer and Claude Code.
 
 ## Usage
 
 ```bash
-# Interactive list + arrow-key picker
-claude-history
-
-# Short alias
-ch
-
-# Open session by number
-claude-history 1
-
-# Open session by (partial) ID
-claude-history c7b4
-
-# Search within a session
-claude-history 2 -s kitty
-
-# Help
-claude-history --help
+claude-past                       # interactive picker
+claude-past kitty theme           # picker, already filtered
+claude-past open 1                # resume the most recent session
+claude-past open c7b4             # resume by the start of a session ID
+claude-past view 2                # print a conversation
+claude-past view 2 -s background  # only the turns that mention "background"
+claude-past rename 2 "Kitty setup"
+claude-past rename 2 ""           # back to the original title
+claude-past list                  # plain list, good for piping
 ```
 
-## Keyboard shortcuts in picker
+`cpa` is installed as a short alias for `claude-past`.
+
+### This directory or all directories
+
+When the directory you are in has sessions of its own and there are others elsewhere, the picker first asks which to show. Skip the question with a flag:
+
+```bash
+claude-past --here      # or -d: only sessions started in this directory
+claude-past --global    # or -g: sessions from every directory
+```
+
+`open`, `view`, `rename` and `list` use every directory unless you pass `--here`.
+
+### Keys in the picker
 
 | Key | Action |
 |-----|--------|
-| `↑` / `k` | Move up |
-| `↓` / `j` | Move down |
-| `Enter` | Open selected session |
-| `q` / `Ctrl+C` | Quit |
+| type | Search |
+| `↑` `↓` | Move |
+| `Enter` | Open the session in Claude Code |
+| `Tab` | Read the conversation |
+| `Ctrl+R` | Rename |
+| `Ctrl+G` | Switch between this directory and all directories |
+| `Ctrl+U` | Clear the search |
+| `Esc` | Clear the search, then quit |
 
 ## How it works
 
-Claude Code stores every conversation as a `.jsonl` file in `~/.claude/projects/`.  
-`claude-history` reads those files, pairs up user and assistant messages, and renders them with color and formatting.
+Claude Code stores each session as a `.jsonl` file under `~/.claude/projects/`. `claude-past` reads those files and never writes to them. Custom names are kept separately in `~/.config/claude-past/names.json`.
 
-## Requirements
+Titles come from, in order: your custom name, the title Claude Code generated, the first prompt.
 
-- Node.js ≥ 18
-- [Claude Code](https://claude.ai/code) installed and used at least once
-
-## Contributing
-
-PRs welcome! Open an issue first for large changes.
+## Development
 
 ```bash
-git clone https://github.com/sattwik/claude-history
-cd claude-history
+git clone https://github.com/Sattwik999/claude-past.git
+cd claude-past
 npm install
-npm run dev        # run from source with tsx
-npm run build      # compile TypeScript
+npm run dev      # run from source
+npm run build    # compile to dist/
 ```
-
-## Author
-
-**Sattwik Sarkar** — built with [Claude Code](https://claude.ai/code)
 
 ## License
 
