@@ -65,7 +65,11 @@ function openInClaude(session: Session): never {
     console.error(`  ${gold('!')} Folder ${tildify(session.cwd)} no longer exists; Claude Code may not find this session.`)
   }
   console.log(`\n  ${dim('Opening')} ${bold(session.title)} ${grey(`in ${tildify(cwd)}`)}\n`)
-  const run = spawnSync('claude', ['--resume', session.id], { cwd, stdio: 'inherit' })
+  // On Windows, `claude` is a .cmd shim that spawnSync can't exec directly
+  // without a shell; shell:true is a no-op (and safe) on macOS/Linux.
+  const run = spawnSync('claude', ['--resume', session.id], {
+    cwd, stdio: 'inherit', shell: process.platform === 'win32',
+  })
   if (run.error) {
     fail(`Could not start Claude Code (${run.error.message}). Is the \`claude\` command installed?`)
   }
