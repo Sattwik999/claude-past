@@ -1,0 +1,51 @@
+{
+  "name": "claude-history",
+  "version": "1.0.0",
+  "description": "Browse and search your Claude Code terminal sessions from the CLI",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "ai",
+    "cli",
+    "terminal",
+    "history"
+  ],
+  "author": "Sattwik Sarkar",
+  "license": "MIT",
+  "homepage": "https://github.com/sattwik/claude-history",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sattwik/claude-history.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sattwik/claude-history/issues"
+  },
+  "type": "module",
+  "bin": {
+    "claude-history": "./dist/cli.js",
+    "ch": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "fsevents@2.3.3": true
+  }
+}
