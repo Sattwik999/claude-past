@@ -29,6 +29,8 @@ export interface Turn {
 export interface Session {
   id: string
   filePath: string
+  /** Name of the folder under ~/.claude/projects that holds the file. */
+  project: string
   /** Folder the session was started in; `claude --resume` must run there. */
   cwd: string
   /** Name to show: custom name, else Claude's own title, else first prompt. */

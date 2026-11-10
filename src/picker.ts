@@ -4,6 +4,7 @@
  *   type        filter by title, ID, folder or anything said in the session
  *   ↑ ↓         move            Enter   open in Claude Code
  *   Tab         read transcript Ctrl+R  rename
+ *   Ctrl+D      delete (moves the session to the trash)
  *   Ctrl+G      switch between this directory and all directories
  *   Esc         clear search, then quit
  */
@@ -97,6 +98,8 @@ export interface PickOptions {
   scope: Scope
   query: string
   onRename: (session: Session, name: string) => void
+  /** Delete the session; return an error message to show, or nothing on success. */
+  onDelete: (session: Session) => string | void
 }
 
 export function pick(opts: PickOptions): Promise<PickResult> {
@@ -108,6 +111,8 @@ export function pick(opts: PickOptions): Promise<PickResult> {
     let top = 0
     let renaming = false
     let renameBuf = ''
+    let confirming = false       // waiting for y/n on a delete
+    let notice = ''              // one-line message under the list
 
     const base = () => (scope === 'here' ? opts.here : opts.all)
     let filtered = filterSessions(base(), query)
@@ -153,10 +158,14 @@ export function pick(opts: PickOptions): Promise<PickResult> {
         }
       }
 
-      out.push('')
-      out.push(renaming
-        ? `  ${dim('Enter save · Esc cancel · save empty to restore the original title')}`
-        : `  ${dim(`↑↓ move · Enter open · Tab read · ^R rename · ^G ${scope === 'here' ? 'all directories' : 'this directory'} · Esc quit`)}`)
+      out.push(notice ? `  ${cyan(fit(notice, w))}` : '')
+      if (confirming && filtered[idx]) {
+        out.push(`  ${gold(bold('Delete'))} ${bold(fit(filtered[idx].title, w - 40).trimEnd())}${gold(bold('?'))}  ${dim('y = move to trash · any other key = cancel')}`)
+      } else if (renaming) {
+        out.push(`  ${dim('Enter save · Esc cancel · save empty to restore the original title')}`)
+      } else {
+        out.push(`  ${dim(`↑↓ · Enter open · Tab read · ^R rename · ^D delete · ^G ${scope === 'here' ? 'all dirs' : 'this dir'} · Esc quit`)}`)
+      }
 
       stdout.write('\x1b[H\x1b[2J' + out.join('\n'))
     }
@@ -173,6 +182,26 @@ export function pick(opts: PickOptions): Promise<PickResult> {
       const current = filtered[idx]
 
       if (key === '\x03') return finish(null)                    // Ctrl+C
+      notice = ''
+
+      if (confirming) {
+        confirming = false
+        if ((key === 'y' || key === 'Y') && current) {
+          const problem = opts.onDelete(current)
+          if (problem) {
+            notice = problem
+          } else {
+            for (const list of [opts.all, opts.here]) {
+              const at = list.indexOf(current)
+              if (at !== -1) list.splice(at, 1)
+            }
+            filtered = filterSessions(base(), query)
+            idx = Math.min(idx, Math.max(0, filtered.length - 1))
+            notice = `Moved to trash. Undo: claude-past restore ${current.id.slice(0, 8)}`
+          }
+        }
+        return render()
+      }
 
       if (renaming) {
         if (key === '\r' || key === '\n') {
@@ -206,6 +235,8 @@ export function pick(opts: PickOptions): Promise<PickResult> {
           renaming = true
           renameBuf = current.title
         }
+      } else if (key === '\x04') {                               // Ctrl+D
+        if (current) confirming = true
       } else if (key === '\x07') {                               // Ctrl+G
         scope = scope === 'here' ? 'all' : 'here'
         refilter()

@@ -11,7 +11,8 @@ Claude Code's own `claude --resume` shows a picker, but it only matches against 
 - **Full-text search** — not just titles. Type a word you remember saying, and every session that mentions it shows up with the matching line
 - **Enter resumes the session in Claude Code** (`claude --resume`), in the folder it was started in
 - **Read before you commit** — `Tab` shows the transcript without resuming
-- **Rename sessions** with your own names, stored separately; Claude Code's own files are never touched
+- **Rename sessions** with your own names, stored separately from Claude Code's files
+- **Delete sessions you no longer need** — they go to a trash folder first, so a wrong keypress can be undone
 - **This directory or everywhere** — scope to where you're standing, or search your whole history; `Ctrl+G` switches either way
 - **Zero runtime dependencies** — fast to install, nothing to break
 
@@ -35,6 +36,10 @@ claude-past view 2 -s background  # only the turns that mention "background"
 claude-past rename 2 "Kitty setup"
 claude-past rename 2 ""           # back to the original title
 claude-past list                  # plain list, good for piping
+claude-past delete 3              # move a session to the trash (asks first)
+claude-past trash                 # see what's in the trash
+claude-past restore 1             # bring a trashed session back
+claude-past trash --empty         # permanently delete everything in the trash
 ```
 
 `cpa` is installed as a short alias for `claude-past`.
@@ -59,15 +64,24 @@ claude-past --global    # or -g: sessions from every directory
 | `Enter` | Open the session in Claude Code |
 | `Tab` | Read the conversation |
 | `Ctrl+R` | Rename |
+| `Ctrl+D` | Delete (asks first, moves to the trash) |
 | `Ctrl+G` | Switch between this directory and all directories |
 | `Ctrl+U` | Clear the search |
 | `Esc` | Clear the search, then quit |
 
 ## How it works
 
-Claude Code stores each session as a `.jsonl` file under `~/.claude/projects/`. `claude-past` reads those files and never writes to them — it's a read-only view on top of what's already there.
+Claude Code stores each session as a `.jsonl` file under `~/.claude/projects/`. `claude-past` reads those files and never edits their contents.
 
 Titles come from, in order: your custom name (if you set one with `rename`), the title Claude Code generated for it, or the first prompt.
+
+### Deleting
+
+`delete` (or `Ctrl+D` in the picker) moves the session's file out of Claude Code's folder into `~/.config/claude-past/trash/`. Claude Code stops listing it, and nothing is erased until you run `claude-past trash --empty`. `restore` moves the file back.
+
+- You are always asked before a delete; pass `-y` to skip the question in scripts.
+- A session used in the last two minutes is assumed to be open and is not deleted unless you pass `-y`.
+- Only the conversation file is moved. Small side files Claude Code keeps elsewhere (such as file-edit history) are left alone.
 
 > **Note:** names you set with `claude-past rename` live in `~/.config/claude-past/names.json` and are separate from anything Claude Code itself tracks — so a rename here won't show up in Claude Code's own `--resume` picker, and vice versa.
 

@@ -47,11 +47,11 @@ function renderBody(text: string, search: string, max: number): string {
 }
 
 /** Plain numbered list (used when output is piped, and by `list`). */
-export function listSessions(sessions: Session[]): void {
+export function listSessions(sessions: Session[], heading = 'Claude Code sessions'): void {
   const w = width()
   const titleW = w - 34
   console.log()
-  console.log(`  ${bold(gold('Claude Code sessions'))}  ${grey(String(sessions.length))}`)
+  console.log(`  ${bold(gold(heading))}  ${grey(String(sessions.length))}`)
   console.log(`  ${frame('─'.repeat(w))}`)
   sessions.forEach((s, i) => {
     const num = gold(bold(String(i + 1).padStart(2) + '.'))

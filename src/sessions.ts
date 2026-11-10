@@ -1,5 +1,6 @@
 import {
-  existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync,
+  copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync,
+  rmSync, statSync, unlinkSync, writeFileSync,
 } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
@@ -7,10 +8,11 @@ import type { ContentBlock, RawEntry, Session, Turn } from './types.js'
 
 const PROJECTS_DIR = join(homedir(), '.claude', 'projects')
 const CONFIG_DIR = join(
-  process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'),
+  process.env.XDG_CONFIG_HOME || join(homedir(), '.config'),
   'claude-past'
 )
 const NAMES_FILE = join(CONFIG_DIR, 'names.json')
+const TRASH_DIR = join(CONFIG_DIR, 'trash')
 
 // ── custom names ────────────────────────────────────────────────────────────
 // Stored in our own file, so Claude Code's session files are never modified.
@@ -63,7 +65,7 @@ function textOf(content: string | ContentBlock[] | undefined): string {
 
 // ── loading ─────────────────────────────────────────────────────────────────
 
-function parseSession(filePath: string, id: string, names: Record<string, string>): Session | null {
+function parseSession(filePath: string, project: string, id: string, names: Record<string, string>): Session | null {
   let entries: RawEntry[]
   try {
     entries = readFileSync(filePath, 'utf-8')
@@ -112,19 +114,19 @@ function parseSession(filePath: string, id: string, names: Record<string, string
   ].join('\n').toLowerCase()
 
   return {
-    id, filePath, cwd, title, customName, turns,
+    id, filePath, project, cwd, title, customName, turns,
     firstTs: turns[0].promptTs, lastTs, haystack,
   }
 }
 
-/** Every session from every project folder, newest first. */
-export function loadSessions(): Session[] {
-  if (!existsSync(PROJECTS_DIR)) return []
+/** Every session under `root` (one sub-folder per project), newest first. */
+function loadFrom(root: string): Session[] {
+  if (!existsSync(root)) return []
   const names = loadNames()
   const sessions: Session[] = []
 
-  for (const project of readdirSync(PROJECTS_DIR)) {
-    const dir = join(PROJECTS_DIR, project)
+  for (const project of readdirSync(root)) {
+    const dir = join(root, project)
     let files: string[]
     try {
       files = readdirSync(dir).filter(f => f.endsWith('.jsonl'))
@@ -132,12 +134,66 @@ export function loadSessions(): Session[] {
       continue   // not a directory
     }
     for (const f of files) {
-      const s = parseSession(join(dir, f), f.slice(0, -'.jsonl'.length), names)
+      const s = parseSession(join(dir, f), project, f.slice(0, -'.jsonl'.length), names)
       if (s) sessions.push(s)
     }
   }
 
   return sessions.sort((a, b) => b.lastTs.localeCompare(a.lastTs))
+}
+
+/** Every session from every project folder, newest first. */
+export function loadSessions(): Session[] {
+  return loadFrom(PROJECTS_DIR)
+}
+
+// ── deleting ────────────────────────────────────────────────────────────────
+// "Delete" moves the session file into our own trash folder, so it can be
+// restored. Only `emptyTrash` removes anything for good.
+
+function move(from: string, to: string): void {
+  try {
+    renameSync(from, to)
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'EXDEV') throw err
+    copyFileSync(from, to)       // different disk: copy, then remove
+    unlinkSync(from)
+  }
+}
+
+/** True if the session file changed in the last two minutes (probably open now). */
+export function looksActive(session: Session): boolean {
+  try {
+    return Date.now() - statSync(session.filePath).mtimeMs < 2 * 60 * 1000
+  } catch {
+    return false
+  }
+}
+
+/** Move a session to the trash. Claude Code will no longer list it. */
+export function deleteSession(session: Session): void {
+  const dir = join(TRASH_DIR, session.project)
+  mkdirSync(dir, { recursive: true })
+  move(session.filePath, join(dir, `${session.id}.jsonl`))
+}
+
+/** Sessions currently in the trash, newest first. */
+export function loadTrash(): Session[] {
+  return loadFrom(TRASH_DIR)
+}
+
+/** Put a trashed session back where Claude Code can find it. */
+export function restoreSession(trashed: Session): void {
+  const dir = join(PROJECTS_DIR, trashed.project)
+  const target = join(dir, `${trashed.id}.jsonl`)
+  if (existsSync(target)) throw new Error('A session with this ID already exists.')
+  mkdirSync(dir, { recursive: true })
+  move(trashed.filePath, target)
+}
+
+/** Permanently remove everything in the trash. */
+export function emptyTrash(): void {
+  rmSync(TRASH_DIR, { recursive: true, force: true })
 }
 
 // ── searching ───────────────────────────────────────────────────────────────
@@ -167,12 +223,14 @@ export function snippet(session: Session, query: string, width: number): string 
 
 /** Find a session by list number (1-based) or by full/partial id. */
 export function resolveSession(sessions: Session[], target: string): Session | string {
-  if (/^\d+$/.test(target) && target.length < 5) {
-    const s = sessions[parseInt(target, 10) - 1]
-    return s ?? `No session #${target} (there are ${sessions.length}).`
-  }
+  // A plain number within the list is a list position; anything else
+  // (including digits with a leading zero) is the start of a session ID.
+  const n = /^[1-9]\d*$/.test(target) ? parseInt(target, 10) : 0
+  if (n >= 1 && n <= sessions.length) return sessions[n - 1]
   const matches = sessions.filter(s => s.id.startsWith(target))
   if (matches.length === 1) return matches[0]
   if (matches.length > 1) return `'${target}' matches ${matches.length} sessions; type more of the ID.`
-  return `No session with ID starting '${target}'.`
+  return n
+    ? `No session #${target} (there are ${sessions.length}).`
+    : `No session with ID starting '${target}'.`
 }
